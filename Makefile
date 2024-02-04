@@ -1,5 +1,6 @@
 C=g++
 FILES=main.cpp
+INCLUDE_DIRS = -I/usr/include/lame
 
 all: $(FILES)
-	$(C) *.cpp -o converter -l:libmp3lame.a -lpthread
+	$(C) $(INCLUDE_DIRS)  $(FILES) -o converter -l:libmp3lame.a -lpthread

@@ -9,7 +9,7 @@
 #include <assert.h>
 #include <exception>
 #include <string.h>
-#include "lame/include/lame.h"
+#include "lame.h"
 
 std::string inputSuffix = ".wav";
 
@@ -82,6 +82,7 @@ bool convertToMp3(std::string fileName, std::string folder)
 	lame_close(lame);
 	fclose(mp3);
 	fclose(pcm);
+	return 0;
 }
 
 
