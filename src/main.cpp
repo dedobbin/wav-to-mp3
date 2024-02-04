@@ -1,14 +1,10 @@
 #include <string>
 #include <iostream>
-#include <dirent.h>
 #include <vector>
-#include <stdio.h>
-#include "unistd.h"
 #include <thread>
 #include <mutex>
-#include <assert.h>
 #include <exception>
-#include <string.h>
+#include <cstring>
 #include <filesystem>
 #include "lame/lame.h"
 
