@@ -9,7 +9,10 @@
 #include <assert.h>
 #include <exception>
 #include <string.h>
+#include <filesystem>
 #include "lame/lame.h"
+
+namespace fs = std::filesystem;
 
 std::string inputSuffix = ".wav";
 
@@ -105,39 +108,18 @@ void process(std::vector<std::string>* fileNames, std::string outputPath, int tI
 
 std::vector<std::string> getInputFiles(std::string path)
 {
- 	struct dirent *entry;
-	DIR *dp;
-
 	std::vector<std::string> result;
-
-    dp = opendir(path.c_str());
-    if (dp == NULL) {
-		std::cerr  << "Cannot open folder " << path << std::endl;
-        exit(1);
+    try {
+        for (const auto& entry : fs::directory_iterator(path)) {
+            if (fs::is_regular_file(entry)) {
+                std::cout << entry.path().filename() << std::endl;
+				result.push_back(path + "/" +entry.path().filename().string());
+            }
+        }
+    } catch (const fs::filesystem_error& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
     }
-
-    while ((entry = readdir(dp))){
-		// if (entry->d_name == ".." || entry->d_name == "." ){
-		// 	continue;
-		// }
-
- 		DIR* directory = opendir( (path + "/" + entry->d_name).c_str());
-		if (directory != NULL){
-			closedir(directory);
-			continue;
-		}
-
-		std::string fileName = entry->d_name;
-		if (
-			fileName.size() >= inputSuffix.size() && 
-			fileName.compare(fileName.size() - inputSuffix.size(), inputSuffix.size(), inputSuffix) == 0
-		){
-			result.push_back(path + "/" + entry->d_name);
-		}	
-	}
-
-    closedir(dp);
-    return result;
+	return result;
 }
 
 int main(int argc, char* argv[])

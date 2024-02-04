@@ -7,7 +7,7 @@ find_package(LAME REQUIRED)
 find_package(Threads REQUIRED)
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(SOURCES
     src/main.cpp
 )
@@ -18,6 +18,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${LAME_INCLUDE_DIR})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${LAME_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
+target_link_libraries(${PROJECT_NAME} PRIVATE stdc++fs)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
