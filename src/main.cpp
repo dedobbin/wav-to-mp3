@@ -9,7 +9,7 @@
 #include <assert.h>
 #include <exception>
 #include <string.h>
-#include "lame.h"
+#include "lame/lame.h"
 
 std::string inputSuffix = ".wav";
 
