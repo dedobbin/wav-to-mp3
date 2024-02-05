@@ -43,8 +43,6 @@ bool convertToMp3(std::string fileName, std::string folder)
 		std::cerr << "Error opening " << fileName << std::endl;
 		exit(1);
 	}
-	fseek(pcm, 4*1024, SEEK_CUR);
-	rewind(pcm);
 
 	auto fileNameWithoutSuffix = fileName.substr(0, fileName.size()-inputSuffix.size());
 
