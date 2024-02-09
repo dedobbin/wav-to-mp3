@@ -141,75 +141,31 @@ bool convertToMp3(std::string fileName, std::string folder)
 	}
 
 	const int bufferSize = getNumSamples(info);
-	short buffer[bufferSize];
-	int i = 0;
-	while (!iStream.eof()) {
-		uint16_t value;
-    	iStream.read(reinterpret_cast<char*>(&value), sizeof(uint16_t));
-		if (iStream.gcount() == sizeof(uint16_t)) {
-			buffer[i] = value;
-		} else {
-			std::cerr << "Read fail" << std::endl;
-			break;
-		}
-		i++;
-	}
 
-	unsigned char mp3Buffer[bufferSize]; 
-	int mp3Size = lame_encode_buffer_interleaved(lame, buffer, bufferSize, mp3Buffer, bufferSize);
-    oStream.write(reinterpret_cast<char*>(mp3Buffer), mp3Size);
+	// TODO: use buffer size
+    int read, write;
+    const int PCM_SIZE = 8192;
+    const int MP3_SIZE = 8192;
 
-	lame_close(lame);
-	iStream.close(); //TODO: use smart ptr
-	oStream.close(); //TODO: use smart ptr
+    short int pcm_buffer[PCM_SIZE*2];
+    unsigned char mp3_buffer[MP3_SIZE];
+
+    do {
+        iStream.read(reinterpret_cast<char*>(pcm_buffer), 2 * sizeof(short int) * PCM_SIZE);
+		std::size_t read = iStream.gcount() / (2 * sizeof(short int));
+        if (!iStream)
+            write = lame_encode_flush(lame, mp3_buffer, MP3_SIZE);
+        else
+            write = lame_encode_buffer_interleaved(lame, pcm_buffer, read, mp3_buffer, MP3_SIZE);
+
+        oStream.write(reinterpret_cast<const char*>(mp3_buffer), write);
+    } while (iStream);
+
+   	lame_close(lame);
+    iStream.close();
+    oStream.close();
 
 	return true;
-
-
-
-	// int read, write;
-	// FILE *pcm = fopen((fileName).c_str(), "rb"); 
-	// if (!pcm){
-	// 	std::cerr << "Error opening " << fileName << std::endl;
-	// 	exit(1);
-	// }
-
-	// auto fileNameWithoutSuffix = fileName.substr(0, fileName.size()-inputSuffix.size());
-
-	// auto mp3 = fopen((fileNameWithoutSuffix + ".mp3").c_str(), "wb"); 
-	// if (!mp3){
-	// 	std::cerr << "Error opening " << fileNameWithoutSuffix << ".mp3 for writing" << std::endl;
-	// 	exit(3);
-	// }
-	
-	// const int PCM_SIZE = 8192*3;
-	// const int MP3_SIZE = 8192*3;
-	// short int pcm_buffer[PCM_SIZE*2];
-	// unsigned char mp3_buffer[MP3_SIZE];
-
-	// lame_t lame = lame_init();
-	// lame_set_in_samplerate(lame, getWavSampleRate(pcm));
-	// lame_set_VBR(lame, vbr_default);
-	// lame_init_params(lame);
-
-	// int nTotalRead=0;
-
-	// do {
-	// 	read = fread(pcm_buffer, 2*sizeof(short int), PCM_SIZE, pcm);
-	// 	nTotalRead+=read*4;
-	// 	if (read == 0){
-	// 		write = lame_encode_flush(lame, mp3_buffer, MP3_SIZE);
-	// 	}else{
-	// 		write = lame_encode_buffer_interleaved(lame,pcm_buffer, read, mp3_buffer, MP3_SIZE);
-	// 	}
-
-	// 	fwrite(mp3_buffer, write, 1, mp3);
-	// } while (read != 0);
-
-	// lame_close(lame);
-	// fclose(mp3);
-	// fclose(pcm);
-	// return 0;
 }
 
 
@@ -255,7 +211,6 @@ int main(int argc, char* argv[])
 	std::string path = argv[1];
 
 	auto fileNames = getInputFiles(path);
-
 	int nThreads = getNCores();
 	std::vector<std::thread> threads;
 	for(int i = 0; i < nThreads; i++){  
