@@ -5,7 +5,11 @@ Commandline tool for linux to convert wav files to mp3 files.
 [lame](https://lame.sourceforge.io/)
 
 ## Build
-Simply run make without any arguments
-
+``````
+mkdir build
+cd build
+cmake ..
+make
+``````
 ## Usage
 ./converter path-to-dir-of-files
