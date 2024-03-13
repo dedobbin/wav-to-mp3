@@ -17,6 +17,15 @@ std::mutex m;
 
 bool keepGoing = true;
 
+struct fstream_closer {
+    void operator()(std::fstream* stream) const {
+        if (stream) {
+            stream->close();
+            delete stream;
+        }
+    }
+};
+
 enum AudioFormat
 {
 	UNKNOWN,
@@ -34,25 +43,7 @@ struct WavInfo
 
 };
 
-class ScopedFile {
-public:
-    ScopedFile(const std::string& filename) : file(filename,  std::ios::binary) {}
-    
-    ~ScopedFile() {
-        if (file.is_open()) {
-            file.close();
-        }
-    }
-    
-    std::ifstream& get() {
-        return file;
-    }
-    
-private:
-    std::ifstream file;
-};
-
-WavInfo getWavInfo(std::ifstream &input)
+WavInfo getWavInfo(std::fstream &input)
 {
 	const int startPos = input.tellg();
 	input.seekg(0, std::ios::beg);
@@ -80,7 +71,6 @@ WavInfo getWavInfo(std::ifstream &input)
 		memcpy(&result.dataSize, buffer + 40, 4);
 	}
 
-	
 	input.seekg(startPos, std::ios::beg);
 	
 	return result;
@@ -100,8 +90,10 @@ int getNCores()
 // TODO: use const &
 bool convertToMp3(std::string fileName, std::string folder)
 {
-	ScopedFile iStream(fileName);
-	if (!iStream.get().is_open()){
+	using unique_fstream = std::unique_ptr<std::fstream, fstream_closer>;
+
+	unique_fstream iStream(new std::fstream(fileName, std::ios::in | std::ios::binary));
+	if (!iStream->is_open()){
 		std::cerr << "Failed to open file " << fileName << std::endl;
 		return false;
 	}	
@@ -109,33 +101,30 @@ bool convertToMp3(std::string fileName, std::string folder)
 	std::string fileNameWithoutSuffix = fileName.substr(0, fileName.size()-inputSuffix.size());
 	
 	std::string outputFileName = fileNameWithoutSuffix + ".mp3";
-	std::ofstream oStream(outputFileName, std::ios::binary);
-	if (!oStream.is_open()){
+	unique_fstream oStream(new std::fstream(outputFileName, std::ios::out | std::ios::binary));
+	if (!oStream->is_open()){
 		std::cerr << "Failed to open file " << outputFileName << std::endl;
 		return false;
 	}
 
-	WavInfo info = getWavInfo(iStream.get());
+	WavInfo info = getWavInfo(*iStream);
 	if (info.audioFormat == AudioFormat::UNKNOWN){
-		std::cerr << "Could not determine audio format of " << fileName  << std::endl;
-		oStream.close(); //TODO: use smart ptr
+		std::cerr << fileName << ": Could not determine audio format, aborting" << std::endl;
 		return false;
 	}
 
 	if (info.audioFormat != AudioFormat::PCM){
-		std::cerr << fileName << " uses unsupported encoding"  << std::endl;
-		oStream.close(); //TODO: use smart ptr
+		std::cerr << fileName << ": Unsupported encoding"  << std::endl;
 		return false;
 	}
 
 	if (info.bitsPerSample != 16){
-		std::cerr << fileName << " uses unsupported bits per same" << info.bitsPerSample << std::endl;
-		oStream.close(); //TODO: use smart ptr
+		std::cerr << fileName << ": Unsupported bits per sample" << info.bitsPerSample << std::endl;
 		return false;
 	}
 
 	// TODO: get from header, header can be larger
-    iStream.get().seekg(44, std::ios::beg);
+    iStream->seekg(44, std::ios::beg);
 
 	//TODO: move so is not initialized each call
 	lame_t lame = lame_init();
@@ -149,7 +138,6 @@ bool convertToMp3(std::string fileName, std::string folder)
 	int ret = lame_init_params(lame);
 	if (ret < 0) {
 		lame_close(lame);
-		oStream.close(); //TODO: use smart ptr
 		return false;
 	}
 
@@ -164,18 +152,17 @@ bool convertToMp3(std::string fileName, std::string folder)
     unsigned char mp3_buffer[MP3_SIZE];
 
     do {
-        iStream.get().read(reinterpret_cast<char*>(pcm_buffer), 2 * sizeof(short int) * PCM_SIZE);
-            read = iStream.get().gcount() / (2 * sizeof(short int));
+        iStream->read(reinterpret_cast<char*>(pcm_buffer), 2 * sizeof(short int) * PCM_SIZE);
+            read = iStream->gcount() / (2 * sizeof(short int));
 		if (!iStream.get())
             write = lame_encode_flush(lame, mp3_buffer, MP3_SIZE);
         else
             write = lame_encode_buffer_interleaved(lame, pcm_buffer, read, mp3_buffer, MP3_SIZE);
 
-        oStream.write(reinterpret_cast<const char*>(mp3_buffer), write);
+        oStream->write(reinterpret_cast<const char*>(mp3_buffer), write);
     } while (iStream.get());
 
    	lame_close(lame);
-    oStream.close();
 
 	return true;
 }
