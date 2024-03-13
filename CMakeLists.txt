@@ -10,11 +10,14 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(SOURCES
     src/main.cpp
+    src/lame.cpp
+    src/wave.cpp
+    src/common.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${LAME_INCLUDE_DIR})
+target_include_directories(${PROJECT_NAME} PRIVATE inc ${LAME_INCLUDE_DIR})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${LAME_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
