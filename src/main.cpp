@@ -160,7 +160,7 @@ bool convertToMp3(std::string fileName, std::string folder)
             write = lame_encode_buffer_interleaved(lame, pcm_buffer, read, mp3_buffer, MP3_SIZE);
 
         oStream->write(reinterpret_cast<const char*>(mp3_buffer), write);
-    } while (iStream.get());
+    } while (iStream->good());
 
    	lame_close(lame);
 
