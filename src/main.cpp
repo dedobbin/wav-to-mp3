@@ -7,9 +7,13 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include "lame/lame.h"
+#include "lame.h"
 
 namespace fs = std::filesystem;
+
+auto lame_wrapper = std::make_unique<LameWrapper>();
 
 std::string inputSuffix = ".wav";
 
@@ -127,7 +131,7 @@ bool convertToMp3(std::string fileName, std::string folder)
     iStream->seekg(44, std::ios::beg);
 
 	//TODO: move so is not initialized each call
-	lame_t lame = lame_init();
+	lame_t lame = lame_wrapper->get();
 	lame_set_in_samplerate(lame, info.sampleRate);
 	//TODO: should this be same as input? or can i decide?
 	lame_set_out_samplerate(lame, 44100); 
@@ -161,8 +165,6 @@ bool convertToMp3(std::string fileName, std::string folder)
 
         oStream->write(reinterpret_cast<const char*>(mp3_buffer), write);
     } while (iStream->good());
-
-   	lame_close(lame);
 
 	return true;
 }
@@ -214,8 +216,6 @@ int main(int argc, char* argv[])
     for (auto& thread : threads) {
         thread.join();
     }
-
-    return 0;
 
 	return 0;
 }
