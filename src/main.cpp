@@ -169,20 +169,11 @@ bool convertToMp3(std::string fileName, std::string folder)
 
 
 
-void process(std::vector<std::string>* fileNames, std::string outputPath, int tId)
+void process(std::string fileName, std::string outputPath, int tId)
 {
-	for(;;){		
-		std::unique_lock<std::mutex> guard(m);
-		if (fileNames->size() == 0){
-			break;
-		}
-		auto target = fileNames->back();
-		fileNames->pop_back();
-		guard.unlock();
-		std::cout << "Started converting " << target << " (t" << tId << ")" <<std::endl;
-		convertToMp3(target, outputPath);
-		std::cout << "Done converting " << target << " (t" << tId << ")" <<std::endl;
-	}
+	std::cout << "Started converting " << fileName << " (t" << tId << ")" <<std::endl;
+	convertToMp3(fileName, outputPath);
+	std::cout << "Done converting " << fileName << " (t" << tId << ")" <<std::endl;
 }
 
 std::vector<std::string> getInputFiles(std::string path)
@@ -210,15 +201,21 @@ int main(int argc, char* argv[])
 	std::string path = argv[1];
 
 	auto fileNames = getInputFiles(path);
-	int nThreads = getNCores();
 	std::vector<std::thread> threads;
-	for(int i = 0; i < nThreads; i++){  
-		threads.push_back(std::thread(process, &fileNames, path, i));
-	}
 
-	for(int i = 0; i < nThreads; i++){ 
-		threads[i].join();
-	}
+    // Create threads and add them to the vector
+    for (int i = 0; i < fileNames.size(); i++) {
+		std::string fileName = fileNames.at(i);
+		threads.push_back(std::thread(process, fileName, path, i++));
+
+    }
+
+    // Join all the threads
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    return 0;
 
 	return 0;
 }
