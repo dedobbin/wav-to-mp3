@@ -1,95 +1,14 @@
-#include <string>
 #include <iostream>
-#include <vector>
 #include <thread>
-#include <mutex>
-#include <exception>
-#include <cstring>
-#include <filesystem>
-#include <fstream>
 #include <memory>
 #include "lame/lame.h"
+#include "wave.h"
+#include "common.h"
 #include "lame.h"
 
-namespace fs = std::filesystem;
+const std::string inputSuffix = "wav";
 
 auto lame_wrapper = std::make_unique<LameWrapper>();
-
-std::string inputSuffix = ".wav";
-
-std::mutex m;
-
-bool keepGoing = true;
-
-struct fstream_closer {
-    void operator()(std::fstream* stream) const {
-        if (stream) {
-            stream->close();
-            delete stream;
-        }
-    }
-};
-
-enum AudioFormat
-{
-	UNKNOWN,
-	OTHER,
-	PCM,
-};
-
-struct WavInfo
-{
-	uint32_t sampleRate;
-	uint16_t bitsPerSample;
-	uint16_t numChannels;
-	AudioFormat audioFormat;
-	uint32_t dataSize;
-
-};
-
-WavInfo getWavInfo(std::fstream &input)
-{
-	const int startPos = input.tellg();
-	input.seekg(0, std::ios::beg);
-
-	WavInfo result;
-
-	const int n = 44;
-	char buffer[n];
-    input.read(buffer, n);
-	if (input.gcount() != n){
-		std::cerr << "Failed to read info" << std::endl;
-		result.audioFormat = AudioFormat::UNKNOWN;
-	} else {
-		uint16_t audioFormat;
-		memcpy(&audioFormat, buffer + 20, 2);
-		if (audioFormat == 1){
-			result.audioFormat = AudioFormat::PCM;
-		} else {
-			result.audioFormat = AudioFormat::OTHER;
-		}
-
-		memcpy(&result.numChannels, buffer + 22, 2);
-		memcpy(&result.sampleRate, buffer + 24, 4);
-		memcpy(&result.bitsPerSample, buffer + 34, 2);
-		memcpy(&result.dataSize, buffer + 40, 4);
-	}
-
-	input.seekg(startPos, std::ios::beg);
-	
-	return result;
-}
-
-int getNumSamples(const WavInfo &info)
-{
-	return info.dataSize / (info.numChannels * (info.bitsPerSample/2));
-}
-
-int getNCores()
-{
-	return std::thread::hardware_concurrency();
-}
-
 
 // TODO: use const &
 bool convertToMp3(std::string fileName, std::string folder)
@@ -169,29 +88,11 @@ bool convertToMp3(std::string fileName, std::string folder)
 	return true;
 }
 
-
-
 void process(std::string fileName, std::string outputPath, int tId)
 {
 	std::cout << "Started converting " << fileName << " (t" << tId << ")" <<std::endl;
 	convertToMp3(fileName, outputPath);
 	std::cout << "Done converting " << fileName << " (t" << tId << ")" <<std::endl;
-}
-
-std::vector<std::string> getInputFiles(std::string path)
-{
-	std::vector<std::string> result;
-    try {
-        for (const auto& entry : fs::directory_iterator(path)) {
-            if (fs::is_regular_file(entry)) {
-                std::cout << entry.path().filename() << std::endl;
-				result.push_back(path + "/" +entry.path().filename().string());
-            }
-        }
-    } catch (const fs::filesystem_error& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
-	return result;
 }
 
 int main(int argc, char* argv[])
@@ -202,7 +103,7 @@ int main(int argc, char* argv[])
 	}
 	std::string path = argv[1];
 
-	auto fileNames = getInputFiles(path);
+	auto fileNames = getFilesInDir(path);
 	std::vector<std::thread> threads;
 
     // Create threads and add them to the vector

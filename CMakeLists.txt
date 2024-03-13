@@ -11,6 +11,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(SOURCES
     src/main.cpp
     src/lame.cpp
+    src/wave.cpp
+    src/common.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
