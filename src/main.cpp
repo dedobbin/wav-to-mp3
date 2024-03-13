@@ -34,6 +34,24 @@ struct WavInfo
 
 };
 
+class ScopedFile {
+public:
+    ScopedFile(const std::string& filename) : file(filename,  std::ios::binary) {}
+    
+    ~ScopedFile() {
+        if (file.is_open()) {
+            file.close();
+        }
+    }
+    
+    std::ifstream& get() {
+        return file;
+    }
+    
+private:
+    std::ifstream file;
+};
+
 WavInfo getWavInfo(std::ifstream &input)
 {
 	const int startPos = input.tellg();
@@ -82,8 +100,8 @@ int getNCores()
 // TODO: use const &
 bool convertToMp3(std::string fileName, std::string folder)
 {
-	std::ifstream iStream(fileName, std::ios::binary);
-	if (!iStream.is_open()){
+	ScopedFile iStream(fileName);
+	if (!iStream.get().is_open()){
 		std::cerr << "Failed to open file " << fileName << std::endl;
 		return false;
 	}	
@@ -94,34 +112,30 @@ bool convertToMp3(std::string fileName, std::string folder)
 	std::ofstream oStream(outputFileName, std::ios::binary);
 	if (!oStream.is_open()){
 		std::cerr << "Failed to open file " << outputFileName << std::endl;
-		iStream.close(); //TODO: use smart ptr
 		return false;
 	}
 
-	WavInfo info = getWavInfo(iStream);
+	WavInfo info = getWavInfo(iStream.get());
 	if (info.audioFormat == AudioFormat::UNKNOWN){
 		std::cerr << "Could not determine audio format of " << fileName  << std::endl;
-		iStream.close(); //TODO: use smart ptr
 		oStream.close(); //TODO: use smart ptr
 		return false;
 	}
 
 	if (info.audioFormat != AudioFormat::PCM){
 		std::cerr << fileName << " uses unsupported encoding"  << std::endl;
-		iStream.close(); //TODO: use smart ptr
 		oStream.close(); //TODO: use smart ptr
 		return false;
 	}
 
 	if (info.bitsPerSample != 16){
 		std::cerr << fileName << " uses unsupported bits per same" << info.bitsPerSample << std::endl;
-		iStream.close(); //TODO: use smart ptr
 		oStream.close(); //TODO: use smart ptr
 		return false;
 	}
 
 	// TODO: get from header, header can be larger
-    iStream.seekg(44, std::ios::beg);
+    iStream.get().seekg(44, std::ios::beg);
 
 	//TODO: move so is not initialized each call
 	lame_t lame = lame_init();
@@ -135,7 +149,6 @@ bool convertToMp3(std::string fileName, std::string folder)
 	int ret = lame_init_params(lame);
 	if (ret < 0) {
 		lame_close(lame);
-		iStream.close(); //TODO: use smart ptr
 		oStream.close(); //TODO: use smart ptr
 		return false;
 	}
@@ -151,18 +164,17 @@ bool convertToMp3(std::string fileName, std::string folder)
     unsigned char mp3_buffer[MP3_SIZE];
 
     do {
-        iStream.read(reinterpret_cast<char*>(pcm_buffer), 2 * sizeof(short int) * PCM_SIZE);
-		std::size_t read = iStream.gcount() / (2 * sizeof(short int));
-        if (!iStream)
+        iStream.get().read(reinterpret_cast<char*>(pcm_buffer), 2 * sizeof(short int) * PCM_SIZE);
+            read = iStream.get().gcount() / (2 * sizeof(short int));
+		if (!iStream.get())
             write = lame_encode_flush(lame, mp3_buffer, MP3_SIZE);
         else
             write = lame_encode_buffer_interleaved(lame, pcm_buffer, read, mp3_buffer, MP3_SIZE);
 
         oStream.write(reinterpret_cast<const char*>(mp3_buffer), write);
-    } while (iStream);
+    } while (iStream.get());
 
    	lame_close(lame);
-    iStream.close();
     oStream.close();
 
 	return true;
