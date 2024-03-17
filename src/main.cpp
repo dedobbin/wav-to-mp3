@@ -41,7 +41,12 @@ bool convertToMp3(const std::string& fileName, const std::string& folder)
 	}
 
 	if (info.bitsPerSample != 16){
-		std::cerr << fileName << ": Unsupported bits per sample" << info.bitsPerSample << std::endl;
+		std::cerr << fileName << ": Unsupported bits per sample " << info.bitsPerSample << std::endl;
+		return false;
+	}
+
+	if (info.numChannels != 2){
+		std::cerr << fileName << ": Unsupported number of channels " << info.numChannels << std::endl;
 		return false;
 	}
 
@@ -62,6 +67,7 @@ bool convertToMp3(const std::string& fileName, const std::string& folder)
 		lame_close(lame);
 		return false;
 	}
+	std::cout << "lame_init_params with sampleRate " << info.sampleRate << std::endl;
 
 	const int bufferSize = getNumSamples(info);
 
@@ -109,7 +115,6 @@ int main(int argc, char* argv[])
     for (int i = 0; i < fileNames.size(); i++) {
 		std::string fileName = fileNames.at(i);
 		threads.push_back(std::thread(process, fileName, path, i++));
-
     }
 
     // Join all the threads
