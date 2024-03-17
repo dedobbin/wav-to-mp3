@@ -1,12 +1,19 @@
 #include <iostream>
 #include <thread>
 #include <memory>
+#include <mutex>
 #include "lame/lame.h"
 #include "wave.h"
 #include "common.h"
 #include "lame.h"
 
 const std::string inputSuffix = "wav";
+
+WavInfo last_used_settings;
+std::mutex settings_consistency_mtx;
+// Number of threads currently working
+int n_converting = 0;
+std::mutex n_converting_mtx;
 
 bool convertToMp3(const std::string& fileName, const std::string& folder)
 {
@@ -52,19 +59,39 @@ bool convertToMp3(const std::string& fileName, const std::string& folder)
     iStream->seekg(44, std::ios::beg);
 
 	LameWrapper lame(lame_init());
-	
-	// TODO: this is not thread safe? Make it thread safe so we can support more settings
-	lame_set_in_samplerate(lame.get(), info.sampleRate);
-	//TODO: should this be same as input? or can i decide?
-	lame_set_out_samplerate(lame.get(), 44100); 
-	lame_set_VBR(lame.get(), vbr_default);
-	lame_set_num_channels(lame.get(), info.numChannels);
-	//lame_set_brate(lame, 192);
-	int ret = lame_init_params(lame.get());
-	if (ret < 0) {
-		lame_close(lame.get());
-		return false;
+
+	settings_consistency_mtx.lock();
+	if (last_used_settings.sampleRate != info.sampleRate || last_used_settings.numChannels != info.numChannels){
+		
+		// If we want new settings, we wait for all threads using current settings to finish.
+		// All new incoming threads are waiting for for us now through settings_consistency_mtx.
+		// This is not ideal because we are blocking all threads but changing settings is not thread safe
+		while (true){
+			n_converting_mtx.lock();
+			if (n_converting == 0){
+				n_converting_mtx.unlock();
+				break;
+			}
+			n_converting_mtx.unlock();
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
+		lame_set_in_samplerate(lame.get(), info.sampleRate);
+		//TODO: should this be same as input? or can i decide?
+		lame_set_out_samplerate(lame.get(), 44100); 
+		lame_set_VBR(lame.get(), vbr_default);
+		lame_set_num_channels(lame.get(), info.numChannels);
+		//lame_set_brate(lame, 192);
+		int ret = lame_init_params(lame.get());
+		if (ret < 0) {
+			settings_consistency_mtx.unlock();
+			return false;
+		}
+		last_used_settings = info;
 	}
+	n_converting_mtx.lock();
+	n_converting ++;
+	n_converting_mtx.unlock();
+	settings_consistency_mtx.unlock();
 			
 	const int bufferSize = getNumSamples(info);
 
@@ -94,6 +121,9 @@ void process(std::string fileName, std::string outputPath, int tId)
 {
 	std::cout << "Started converting " << fileName << " (t" << tId << ")" <<std::endl;
 	convertToMp3(fileName, outputPath);
+	n_converting_mtx.lock();
+	n_converting --;
+	n_converting_mtx.unlock();
 	std::cout << "Done converting " << fileName << " (t" << tId << ")" <<std::endl;
 }
 
