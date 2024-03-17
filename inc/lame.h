@@ -5,7 +5,7 @@
 class LameWrapper
 {
 public:
-    LameWrapper();
+    LameWrapper(lame_t lame);
     ~LameWrapper();
     lame_t get();
 private:
