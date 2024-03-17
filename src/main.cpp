@@ -10,8 +10,7 @@ const std::string inputSuffix = "wav";
 
 auto lame_wrapper = std::make_unique<LameWrapper>();
 
-// TODO: use const &
-bool convertToMp3(std::string fileName, std::string folder)
+bool convertToMp3(const std::string& fileName, const std::string& folder)
 {
 	using unique_fstream = std::unique_ptr<std::fstream, fstream_closer>;
 
@@ -49,7 +48,6 @@ bool convertToMp3(std::string fileName, std::string folder)
 	// TODO: get from header, header can be larger
     iStream->seekg(44, std::ios::beg);
 
-	//TODO: move so is not initialized each call
 	lame_t lame = lame_wrapper->get();
 	lame_set_in_samplerate(lame, info.sampleRate);
 	//TODO: should this be same as input? or can i decide?
@@ -58,6 +56,7 @@ bool convertToMp3(std::string fileName, std::string folder)
 	lame_set_num_channels(lame, info.numChannels);
 	//lame_set_brate(lame, 192);
 
+	// TODO: this is not quite thread safe. Only do so if settings are the same
 	int ret = lame_init_params(lame);
 	if (ret < 0) {
 		lame_close(lame);
