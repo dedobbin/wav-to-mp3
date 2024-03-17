@@ -1,6 +1,7 @@
 #include "lame.h"
 
-LameWrapper::LameWrapper()
+LameWrapper::LameWrapper(lame_t lame)
+: lame(lame)
 {
     lame = lame_init();
 }

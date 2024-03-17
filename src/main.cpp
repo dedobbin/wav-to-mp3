@@ -8,10 +8,7 @@
 
 const std::string inputSuffix = "wav";
 
-auto lame_wrapper = std::make_unique<LameWrapper>();
-
-// TODO: use const &
-bool convertToMp3(std::string fileName, std::string folder)
+bool convertToMp3(const std::string& fileName, const std::string& folder)
 {
 	using unique_fstream = std::unique_ptr<std::fstream, fstream_closer>;
 
@@ -42,28 +39,33 @@ bool convertToMp3(std::string fileName, std::string folder)
 	}
 
 	if (info.bitsPerSample != 16){
-		std::cerr << fileName << ": Unsupported bits per sample" << info.bitsPerSample << std::endl;
+		std::cerr << fileName << ": Unsupported bits per sample " << info.bitsPerSample << std::endl;
+		return false;
+	}
+
+	if (info.numChannels != 2){
+		std::cerr << fileName << ": Unsupported number of channels " << info.numChannels << std::endl;
 		return false;
 	}
 
 	// TODO: get from header, header can be larger
     iStream->seekg(44, std::ios::beg);
 
-	//TODO: move so is not initialized each call
-	lame_t lame = lame_wrapper->get();
-	lame_set_in_samplerate(lame, info.sampleRate);
+	LameWrapper lame(lame_init());
+	
+	// TODO: this is not thread safe? Make it thread safe so we can support more settings
+	lame_set_in_samplerate(lame.get(), info.sampleRate);
 	//TODO: should this be same as input? or can i decide?
-	lame_set_out_samplerate(lame, 44100); 
-	lame_set_VBR(lame, vbr_default);
-	lame_set_num_channels(lame, info.numChannels);
+	lame_set_out_samplerate(lame.get(), 44100); 
+	lame_set_VBR(lame.get(), vbr_default);
+	lame_set_num_channels(lame.get(), info.numChannels);
 	//lame_set_brate(lame, 192);
-
-	int ret = lame_init_params(lame);
+	int ret = lame_init_params(lame.get());
 	if (ret < 0) {
-		lame_close(lame);
+		lame_close(lame.get());
 		return false;
 	}
-
+			
 	const int bufferSize = getNumSamples(info);
 
 	// TODO: use buffer size
@@ -78,9 +80,9 @@ bool convertToMp3(std::string fileName, std::string folder)
         iStream->read(reinterpret_cast<char*>(pcm_buffer), 2 * sizeof(short int) * PCM_SIZE);
             read = iStream->gcount() / (2 * sizeof(short int));
 		if (!iStream.get())
-            write = lame_encode_flush(lame, mp3_buffer, MP3_SIZE);
+            write = lame_encode_flush(lame.get(), mp3_buffer, MP3_SIZE);
         else
-            write = lame_encode_buffer_interleaved(lame, pcm_buffer, read, mp3_buffer, MP3_SIZE);
+            write = lame_encode_buffer_interleaved(lame.get(), pcm_buffer, read, mp3_buffer, MP3_SIZE);
 
         oStream->write(reinterpret_cast<const char*>(mp3_buffer), write);
     } while (iStream->good());
@@ -110,7 +112,6 @@ int main(int argc, char* argv[])
     for (int i = 0; i < fileNames.size(); i++) {
 		std::string fileName = fileNames.at(i);
 		threads.push_back(std::thread(process, fileName, path, i++));
-
     }
 
     // Join all the threads
